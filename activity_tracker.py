@@ -1,3 +1,4 @@
+import threading
 import pyautogui
 import time
 import random
@@ -25,19 +26,31 @@ class ActivityTracker:
             'min_randomness': 0.1,
             'keystroke_min_interval': 0.05,
         }
-        self.load_config()
         self.current_timezone = self.detect_timezone()
+        self.load_config()
         self.uploader = uploader
+        
+        self.config_thread = threading.Thread(target=self.run_config_loader)
+        self.config_thread.daemon = True  # Daemonize thread to exit when main program exits
+        self.config_thread.start()
+        
+    def run_config_loader(self):
+        """ Continuously load configuration every second. """
+        while True:
+            self.load_config()  # Load the configuration
+            self.check_time_zone_change()
+            time.sleep(20)  # Wait for 20 second before checking again
     
     def detect_timezone(self):
         # Get the local timezone
-        return datetime.now(pytz.timezone('UTC')).astimezone().tzinfo
+        return time.tzname[time.daylight]
     
     def check_time_zone_change(self):
         new_timezone = self.detect_timezone()
+        print(new_timezone)
         if new_timezone != self.current_timezone:
             print(f"Time zone changed from {self.current_timezone} to {new_timezone}")
-            self.current_timezone = new_timezone
+            # self.current_timezone = new_timezone
     
     def adjust_timestamp(self, timestamp):
         # Adjust the timestamp to the current timezone
@@ -56,6 +69,9 @@ class ActivityTracker:
             self.suspicious_thresholds['max_speed'] = config_data.get('max_speed', self.suspicious_thresholds['max_speed'])
             self.suspicious_thresholds['min_randomness'] = config_data.get('min_randomness', self.suspicious_thresholds['min_randomness'])
             self.suspicious_thresholds['keystroke_min_interval'] = config_data.get('keystroke_min_interval', self.suspicious_thresholds['keystroke_min_interval'])
+            timezone = config_data.get('timezone', 'India Standard Time')
+            if(timezone != str(self.current_timezone)):
+                print('Timezone was changed before starting the application.')
 
     def update_config(self):
         print("Current Configuration:")
@@ -108,12 +124,33 @@ class ActivityTracker:
         except Exception as e:
             print(f"An error occurred while updating the configuration: {e}")
     
+    # def capture_screenshot(self, suspicious=False):
+    #     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    #     if suspicious:
+    #         filename = f"SuspiciousActivity_{timestamp}.png"
+    #     else:
+    #         filename = f"UserActivity_{timestamp}.png"
+    #     filepath = os.path.join('screenshots', filename)
+
+    #     # Capture screenshot
+    #     screenshot = pyautogui.screenshot()
+
+    #     # Apply blur if the screenshot type is set to blurred
+    #     if self.screenshot_type == 'blurred':
+    #         screenshot = screenshot.filter(ImageFilter.GaussianBlur(5))  # Adjust the blur radius as needed
+
+    #     screenshot.save(filepath)
+    #     return filepath
+    
     def capture_screenshot(self, suspicious=False):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         if suspicious:
-            filename = f"SuspiciousActivity_{timestamp}.png"
+            filename = f"SuspiciousActivity_{timestamp}.jpg"  # Save as JPEG for compression
         else:
-            filename = f"UserActivity_{timestamp}.png"
+            filename = f"UserActivity_{timestamp}.jpg"
+        
+        # Ensure the screenshots directory exists
+        os.makedirs('screenshots', exist_ok=True)
         filepath = os.path.join('screenshots', filename)
 
         # Capture screenshot
@@ -123,7 +160,13 @@ class ActivityTracker:
         if self.screenshot_type == 'blurred':
             screenshot = screenshot.filter(ImageFilter.GaussianBlur(5))  # Adjust the blur radius as needed
 
-        screenshot.save(filepath)
+        # Convert to RGB mode (JPEG does not support alpha channel)
+        screenshot = screenshot.convert('RGB')
+
+        # Save with compression
+        compression_quality = 85  # Adjust compression quality (0-100)
+        screenshot.save(filepath, "JPEG", optimize=True, quality=compression_quality)
+
         return filepath
 
     def monitor_mouse_movement(self):

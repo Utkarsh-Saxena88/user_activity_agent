@@ -19,7 +19,8 @@ def main():
         # Initialize Firebase uploader
         firebase_uploader = FirebaseUploader(
             cred_path='config/db-firebase-credentials.json', 
-            bucket_name='user-activity-db.appspot.com'
+            bucket_name='user-activity-db.appspot.com',
+            password='7458'
         )
         firebase_uploader.load_queue()
 
@@ -44,12 +45,12 @@ def main():
         # Poll for configuration updates
         try:
             # Prompt for configuration update only once at the start
-            if input("Do you want to update configuration? (yes/no): ").strip().lower() == "yes":
-                tracker.update_config()
+            # if input("Do you want to update configuration? (yes/no): ").strip().lower() == "yes":
+            #     tracker.update_config()
             
             while True:
                 screenshot_path = tracker.track_user_activity()
-
+                
                 if screenshot_path:  # Check if a valid screenshot path was returned
                     try:
                         # Upload the screenshot to Firebase
