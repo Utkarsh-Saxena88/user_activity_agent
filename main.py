@@ -1,30 +1,50 @@
-import time
-import schedule
 from activity_tracker import ActivityTracker
 from firebase_upload import FirebaseUploader
-from config_handler import load_config
+import time
+import os
+
+# Initialize Firebase uploader
+firebase_uploader = FirebaseUploader(
+    cred_path='config/firebase_credentials.json', 
+    bucket_name='user-activity-agent.appspot.com'
+)
+
+# Directory where screenshots will be saved before uploading
+screenshot_directory = 'screenshots'
+if not os.path.exists(screenshot_directory):
+    os.makedirs(screenshot_directory)
 
 def main():
-    # Load Firebase credentials
-    config = load_config()
-    firebase_cred_path = "config/firebase_credentials.json"
-    bucket_name = config["project_id"] + ".appspot.com"
+    # Ask the user to input the screenshot interval (in seconds)
+    screenshot_interval = float(input("Enter the interval between screenshots (in seconds): "))
 
-    # Initialize modules
-    activity_tracker = ActivityTracker(screenshot_interval=60)
-    firebase_uploader = FirebaseUploader(firebase_cred_path, bucket_name)
+    # Initialize the ActivityTracker with the user-defined screenshot interval
+    tracker = ActivityTracker(screenshot_interval=screenshot_interval)
 
-    # Schedule Screenshot Capture and Upload Task
-    def capture_and_upload_screenshot():
-        screenshot_path = activity_tracker.capture_screenshot()
-        firebase_uploader.upload_file(screenshot_path)
+    try:
+        while True:
+            # Track user activity and capture a screenshot
+            screenshot_path = tracker.track_user_activity()
 
-    schedule.every(60).seconds.do(capture_and_upload_screenshot)
+            if screenshot_path:  # Check if a valid screenshot path was returned
+                try:
+                    # Upload the screenshot to Firebase
+                    firebase_uploader.upload_file(screenshot_path)
+                    print(f"Uploaded {screenshot_path} to Firebase.")
 
-    # Main loop
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+                    # Optionally delete local screenshot after upload
+                    if os.path.exists(screenshot_path):
+                        os.remove(screenshot_path)
+                        print(f"Deleted local file: {screenshot_path}")
+
+                except Exception as e:
+                    print(f"Failed to upload {screenshot_path} to Firebase: {e}")
+
+            # Wait for the user-defined screenshot interval before tracking again
+            time.sleep(tracker.screenshot_interval)
+    
+    except KeyboardInterrupt:
+        print("Program interrupted by user. Exiting gracefully.")
 
 if __name__ == "__main__":
     main()
