@@ -12,7 +12,7 @@ cred = credentials.Certificate('config/db-firebase-credentials.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 class ActivityTracker:
-    def __init__(self, screenshot_interval=5, suspicious_thresholds=None):
+    def __init__(self, uploader, screenshot_interval=5, suspicious_thresholds=None):
         self.last_mouse_position = pyautogui.position()
         self.last_mouse_time = time.time()
         self.last_keystroke_time = time.time()
@@ -27,6 +27,7 @@ class ActivityTracker:
         }
         self.load_config()
         self.current_timezone = self.detect_timezone()
+        self.uploader = uploader
     
     def detect_timezone(self):
         # Get the local timezone
@@ -174,8 +175,7 @@ class ActivityTracker:
         else:
             return self.capture_screenshot(suspicious=False)
 
-    # def update_config(self, interval, screenshot_type, capture_enabled):
-    #     self.screenshot_interval = interval
-    #     self.screenshot_type = screenshot_type
-    #     self.capture_enabled = capture_enabled
-    #     print(f"Updated configuration: interval={self.screenshot_interval}, type={self.screenshot_type}, enabled={self.capture_enabled}")
+    def handle_shutdown(self):
+        """Ensure safe shutdown handling."""
+        print("Tracker shutting down...")
+        self.uploader.shutdown_handler()

@@ -1,30 +1,35 @@
+import signal
 import time
 import os
 from activity_tracker import ActivityTracker
 from firebase_upload import FirebaseUploader
-import firebase_admin
-from firebase_admin import credentials, firestore
-
-# Initialize Firebase Admin SDK
-# cred = credentials.Certificate('config/db-firebase-credentials.json')
-# firebase_admin.initialize_app(cred)
-
-db = firestore.client()
-
-# Initialize Firebase uploader
-firebase_uploader = FirebaseUploader(
-    cred_path='config/db-firebase-credentials.json', 
-    bucket_name='user-activity-db.appspot.com'
-)
-
-# Directory where screenshots will be saved before uploading
-screenshot_directory = 'screenshots'
-if not os.path.exists(screenshot_directory):
-    os.makedirs(screenshot_directory)
+from firebase_admin import firestore
 
 def main():
+    db = firestore.client()
+
+    # Initialize Firebase uploader
+    firebase_uploader = FirebaseUploader(
+        cred_path='config/db-firebase-credentials.json', 
+        bucket_name='user-activity-db.appspot.com'
+    )
+    firebase_uploader.load_queue()
+
+    # Directory where screenshots will be saved before uploading
+    screenshot_directory = 'screenshots'
+    if not os.path.exists(screenshot_directory):
+        os.makedirs(screenshot_directory)
     # Initialize the ActivityTracker
-    tracker = ActivityTracker()
+    tracker = ActivityTracker(uploader=firebase_uploader)
+    
+    def signal_handler(sig, frame):
+        """Handle application shutdown."""
+        print("\nReceived shutdown signal.")
+        tracker.handle_shutdown()
+        exit(0)
+
+    # Catch system interrupt (e.g., CTRL+C)
+    signal.signal(signal.SIGINT, signal_handler)
 
     # Poll for configuration updates
     try:
@@ -52,8 +57,9 @@ def main():
             # Wait for the user-defined screenshot interval before tracking again
             time.sleep(tracker.screenshot_interval)
     
-    except KeyboardInterrupt:
-        print("Program interrupted by user. Exiting gracefully.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        tracker.handle_shutdown()
 
 if __name__ == "__main__":
     main()
