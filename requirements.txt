@@ -3,3 +3,5 @@ pyautogui
 pynput
 psutil
 schedule
+Flask
+pytz

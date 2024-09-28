@@ -3,20 +3,110 @@ import time
 import random
 from datetime import datetime
 import os
+import pytz
+import firebase_admin
+from firebase_admin import credentials, firestore
+from PIL import ImageFilter
 
+cred = credentials.Certificate('config/db-firebase-credentials.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 class ActivityTracker:
     def __init__(self, screenshot_interval=5, suspicious_thresholds=None):
         self.last_mouse_position = pyautogui.position()
         self.last_mouse_time = time.time()
         self.last_keystroke_time = time.time()
         self.suspicious_flag = False
-        self.screenshot_interval = screenshot_interval  # Add screenshot interval
+        self.screenshot_interval = screenshot_interval
+        self.screenshot_type = 'unblurred'  # Default screenshot type
+        self.capture_enabled = True  # Default capture enabled
         self.suspicious_thresholds = suspicious_thresholds or {
-            'max_speed': 3000,  # Maximum pixels per second for mouse movement
-            'min_randomness': 0.1,  # Minimum randomness in movement trajectory
-            'keystroke_min_interval': 0.05,  # Minimum interval between keystrokes in seconds
+            'max_speed': 3000,
+            'min_randomness': 0.1,
+            'keystroke_min_interval': 0.05,
         }
+        self.load_config()
+        self.current_timezone = self.detect_timezone()
+    
+    def detect_timezone(self):
+        # Get the local timezone
+        return datetime.now(pytz.timezone('UTC')).astimezone().tzinfo
+    
+    def check_time_zone_change(self):
+        new_timezone = self.detect_timezone()
+        if new_timezone != self.current_timezone:
+            print(f"Time zone changed from {self.current_timezone} to {new_timezone}")
+            self.current_timezone = new_timezone
+    
+    def adjust_timestamp(self, timestamp):
+        # Adjust the timestamp to the current timezone
+        utc_time = pytz.utc.localize(timestamp)
+        local_time = utc_time.astimezone(self.current_timezone)
+        return local_time
+    
+    def load_config(self):
+        config_ref = db.collection('config').document('settings')
+        config = config_ref.get()
+        if config.exists:
+            config_data = config.to_dict()
+            self.screenshot_interval = config_data.get('screenshot_interval', 5)
+            self.screenshot_type = config_data.get('screenshot_type', 'unblurred')
+            self.capture_enabled = config_data.get('capture_enabled', True)
+            self.suspicious_thresholds['max_speed'] = config_data.get('max_speed', self.suspicious_thresholds['max_speed'])
+            self.suspicious_thresholds['min_randomness'] = config_data.get('min_randomness', self.suspicious_thresholds['min_randomness'])
+            self.suspicious_thresholds['keystroke_min_interval'] = config_data.get('keystroke_min_interval', self.suspicious_thresholds['keystroke_min_interval'])
 
+    def update_config(self):
+        print("Current Configuration:")
+        print(f"Screenshot Interval: {self.screenshot_interval}")
+        print(f"Screenshot Type: {self.screenshot_type}")
+        print(f"Capture Enabled: {self.capture_enabled}")
+        print(f"Max Speed: {self.suspicious_thresholds['max_speed']}")
+        print(f"Min Randomness: {self.suspicious_thresholds['min_randomness']}")
+        print(f"Keystroke Min Interval: {self.suspicious_thresholds['keystroke_min_interval']}\n")
+
+        # Get user input for updates
+        try:
+            new_interval = input("Enter new screenshot interval (seconds, or press Enter to keep current): ")
+            if new_interval:
+                self.screenshot_interval = int(new_interval)
+
+            new_type = input("Enter new screenshot type (blurred/unblurred, or press Enter to keep current): ")
+            if new_type:
+                self.screenshot_type = new_type
+
+            new_capture_enabled = input("Capture enabled (true/false, or press Enter to keep current): ")
+            if new_capture_enabled:
+                self.capture_enabled = new_capture_enabled.lower() == 'true'
+
+            # Update suspicious thresholds
+            new_max_speed = input("Enter new max speed (or press Enter to keep current): ")
+            if new_max_speed:
+                self.suspicious_thresholds['max_speed'] = int(new_max_speed)
+
+            new_min_randomness = input("Enter new min randomness (or press Enter to keep current): ")
+            if new_min_randomness:
+                self.suspicious_thresholds['min_randomness'] = float(new_min_randomness)
+
+            new_keystroke_interval = input("Enter new keystroke min interval (or press Enter to keep current): ")
+            if new_keystroke_interval:
+                self.suspicious_thresholds['keystroke_min_interval'] = float(new_keystroke_interval)
+
+            # Update Firestore document
+            db.collection('config').document('settings').set({
+                'screenshot_interval': self.screenshot_interval,
+                'screenshot_type': self.screenshot_type,
+                'capture_enabled': self.capture_enabled,
+                'max_speed': self.suspicious_thresholds['max_speed'],
+                'min_randomness': self.suspicious_thresholds['min_randomness'],
+                'keystroke_min_interval': self.suspicious_thresholds['keystroke_min_interval'],
+            }, merge=True)
+
+            print("Configuration updated successfully!")
+
+        except Exception as e:
+            print(f"An error occurred while updating the configuration: {e}")
+    
     def capture_screenshot(self, suspicious=False):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         if suspicious:
@@ -24,11 +114,16 @@ class ActivityTracker:
         else:
             filename = f"UserActivity_{timestamp}.png"
         filepath = os.path.join('screenshots', filename)
-        
-        # Capture and save screenshot
+
+        # Capture screenshot
         screenshot = pyautogui.screenshot()
+
+        # Apply blur if the screenshot type is set to blurred
+        if self.screenshot_type == 'blurred':
+            screenshot = screenshot.filter(ImageFilter.GaussianBlur(5))  # Adjust the blur radius as needed
+
         screenshot.save(filepath)
-        return filepath  # Return the path to the screenshot
+        return filepath
 
     def monitor_mouse_movement(self):
         current_mouse_position = pyautogui.position()
@@ -36,14 +131,12 @@ class ActivityTracker:
 
         # Calculate speed of mouse movement
         distance = ((current_mouse_position[0] - self.last_mouse_position[0]) ** 2 +
-                    (current_mouse_position[1] - self.last_mouse_position[1]) ** 2) ** 0.5
+                     (current_mouse_position[1] - self.last_mouse_position[1]) ** 2) ** 0.5
         time_diff = current_time - self.last_mouse_time
         speed = distance / time_diff if time_diff > 0 else 0
 
-        # Analyze movement randomness
-        randomness = random.random()  # Simulate randomness for now, can be enhanced
+        randomness = random.random()
 
-        # Flagging suspicious activity based on speed and randomness
         if speed > self.suspicious_thresholds['max_speed'] or randomness < self.suspicious_thresholds['min_randomness']:
             self.suspicious_flag = True
             print("Suspicious mouse activity detected")
@@ -58,7 +151,6 @@ class ActivityTracker:
         current_time = time.time()
         keystroke_interval = current_time - self.last_keystroke_time
 
-        # Check for rapid, constant keystrokes
         if keystroke_interval < self.suspicious_thresholds['keystroke_min_interval']:
             self.suspicious_flag = True
             print("Suspicious keystroke activity detected")
@@ -69,6 +161,10 @@ class ActivityTracker:
         self.last_keystroke_time = current_time
 
     def track_user_activity(self):
+        self.check_time_zone_change()
+        if not self.capture_enabled:
+            return None  # Return None if capturing is disabled
+
         self.monitor_mouse_movement()
         self.monitor_keystrokes()
 
@@ -77,3 +173,9 @@ class ActivityTracker:
             return self.capture_screenshot(suspicious=True)
         else:
             return self.capture_screenshot(suspicious=False)
+
+    # def update_config(self, interval, screenshot_type, capture_enabled):
+    #     self.screenshot_interval = interval
+    #     self.screenshot_type = screenshot_type
+    #     self.capture_enabled = capture_enabled
+    #     print(f"Updated configuration: interval={self.screenshot_interval}, type={self.screenshot_type}, enabled={self.capture_enabled}")
