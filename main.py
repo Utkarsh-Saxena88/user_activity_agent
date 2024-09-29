@@ -8,6 +8,14 @@ from filelock import FileLock, Timeout
 
 LOCK_FILE = "app_instance.lock"  # Name of the lock file
 
+def check_single_instance():
+    pid_file = 'instance.pid'
+    if os.path.exists(pid_file):
+        print("Another instance is already running.")
+        sys.exit(1)
+    with open(pid_file, 'w') as f:
+        f.write(str(os.getpid()))
+
 def main():
     try:
         # Try to acquire a file lock to ensure only one instance is running
