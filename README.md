@@ -42,64 +42,41 @@ This section breaks down each feature and explains the corresponding implementat
 
 ### Steps
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/yourusername/activity-tracker.git
-    cd activity-tracker
-    ```
+    git clone https://github.com/Utkarsh-Saxena88/user_activity_agent.git
 
 2. Install dependencies:
-    ```bash
     pip install -r requirements.txt
-    ```
 
 3. Configure Firebase:
    - Download your Firebase Admin SDK credentials (`serviceAccountKey.json`).
-   - Place the credentials file in the project directory.
+   - Place the credentials file in the config folder.
    - Modify the Firebase configuration in `firebase_upload.py` to point to your Firebase database.
 
 4. Run the application:
-    ```bash
     python main.py
-    ```
 
 ## Usage
 
 ### 1. **Tracking User Activity**
    - By running `activity_tracker.py`, the application begins logging user activity such as keyboard input, mouse movement, and system interaction.
    - Example:
-     ```bash
      python activity_tracker.py
-     ```
 
 ### 2. **Uploading Logs to Firebase**
    - The `firebase_upload.py` script is responsible for uploading local logs to Firebase. It can be run manually or periodically through a cron job or as a background process in `main.py`.
    - Example:
-     ```bash
      python firebase_upload.py
-     ```
 
 ### 3. **Running the Complete Application**
    - The `main.py` script is the entry point that manages both tracking and uploading processes. Run this script to start tracking activities and automatically upload them to Firebase.
    - Example:
-     ```bash
      python main.py
-     ```
-
-## File Structure
-```
-.
-├── activity_tracker.py      # Handles user activity tracking
-├── firebase_upload.py       # Manages Firebase upload functionality
-├── main.py                  # Main entry point to run the application
-├── requirements.txt         # Dependencies for the project
-└── README.md                # Project documentation
-```
 
 ## Configuration
 
 ### Firebase Setup
 1. Download the Firebase Admin SDK credentials from your Firebase console.
-2. Place the `serviceAccountKey.json` file in your project directory.
+2. Place the `serviceAccountKey.json` file in your config folder.
 3. Update `firebase_upload.py` to include the correct Firebase database URL and credentials path.
 
 ### Adjusting Activity Tracking
@@ -118,14 +95,9 @@ The following Python packages are required for the project to run:
 - **requests**: Facilitates HTTP requests, used for API interactions.
 
 Install all dependencies via:
-```bash
 pip install -r requirements.txt
-```
 
 ## Contributors
-- **[Your Name]** - Initial development
+- **Utkarsh Saxena** - Initial development
 
 Feel free to contribute to this project by opening issues or submitting pull requests.
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
