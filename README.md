@@ -98,6 +98,6 @@ Install all dependencies via:
 pip install -r requirements.txt
 
 ## Contributors
-- **Utkarsh Saxena** - Initial development
+- **Utkarsh-Saxena** - Initial development
 
 Feel free to contribute to this project by opening issues or submitting pull requests.
