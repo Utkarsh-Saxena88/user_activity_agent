@@ -48,14 +48,6 @@ python main.py               # Main script to run both tracking and upload funct
 - Modify `firebase_upload.py` to change Firebase storage paths or adjust how data is structured.
 - `activity_tracker.py` contains logic for tracking activities; adjust intervals, formats, or specific events to track.
 
-## File Structure
-.
-├── activity_tracker.py      # Handles user activity tracking
-├── firebase_upload.py       # Manages Firebase upload functionality
-├── main.py                  # Main entry point to run the application
-├── requirements.txt         # Dependencies for the project
-└── README.md                # Project documentation
-
 ## Requirements
 
 The following Python packages are required:
